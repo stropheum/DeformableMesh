@@ -80,7 +80,7 @@ namespace MeshToy
 
         private void OnGUI()
         {
-            if (_brushVertexSet.Count > 0)
+            if (_brushVertexSet.Count > 0 || !_lastHitPoint.HasValue)
             {
                 InvalidateMesh();
             }
