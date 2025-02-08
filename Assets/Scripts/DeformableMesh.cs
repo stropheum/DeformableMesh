@@ -5,6 +5,7 @@ using UnityEngine.Serialization;
 
 namespace MeshToy
 {
+    //TODO: potentially cache X prior frames rather than interpolation. then find distance to the spline that those points create
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshCollider))]
     [RequireComponent(typeof(MeshRenderer))]
