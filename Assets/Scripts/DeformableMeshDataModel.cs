@@ -12,6 +12,8 @@ namespace MeshToy
         [SerializeField] public LayerMask HitLayerMask;
         [SerializeField] public float BrushRadius;
         [SerializeField] public float DeformSpeed;
+        [SerializeField] public int BrushInterpolationSegments;
+        [SerializeField] public bool DrawGizmos;
     }
 
     [Serializable]

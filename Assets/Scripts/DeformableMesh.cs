@@ -21,8 +21,10 @@ namespace MeshToy
         private DeformableMeshDependencies _deformableMeshDependencies;
         private Vector3 _origin;
         private List<Vector3> _vertices = new();
-        private List<int> _brushedVertices = new();
+        private HashSet<int> _brushVertexSet = new();
         private Mesh _mesh;
+        private Vector3? _lastHitPoint;
+        private IReadOnlyList<Vector3> _cachedInterpolatedPoints;
 
         #region Unity Methods
 
@@ -42,16 +44,43 @@ namespace MeshToy
 
         private void OnDrawGizmos()
         {
+            if (!_dataModel.DrawGizmos) { return; }
+            Gizmos.color = Color.cyan;
             foreach (Vector3 vert in _vertices)
             {
-                Gizmos.color = Color.cyan;
                 Gizmos.DrawSphere(vert, 0.01f);
             }
+
+            if (_brushVertexSet is not { Count: > 0 }) { return; }
+            
+            var grad = new Gradient
+            {
+                colorKeys = new GradientColorKey[]
+                {
+                    new() { color = Color.red, time = 0.0f },
+                    new() { color = Color.green, time = 1.0f }
+                },
+                alphaKeys = new GradientAlphaKey[]
+                {
+                    new() { alpha = 1.0f, time = 0.0f },
+                    new() { alpha = 1.0f, time = 1.0f }
+                }
+            };
+            int count = _cachedInterpolatedPoints.Count;
+            string log = "interpolated points:";
+            for (int i = 0; i < count; i++)
+            {
+                float t = count > 1 ? (float)i / count : 0.0f;
+                Gizmos.color = grad.Evaluate(t);
+                Gizmos.DrawSphere(_cachedInterpolatedPoints[i], 0.01f);
+                log += "\n" + _cachedInterpolatedPoints[i]; 
+            }
+            Debug.Log(log);
         }
 
         private void OnGUI()
         {
-            if (_brushedVertices.Count > 0)
+            if (_brushVertexSet.Count > 0)
             {
                 InvalidateMesh();
             }
@@ -66,26 +95,41 @@ namespace MeshToy
 
         private void HandleMouseInput()
         {
-            _brushedVertices.Clear();
-            if (!Input.GetMouseButton(0)) { return; }
+            _brushVertexSet.Clear();
+            if (Input.GetMouseButtonUp(0)) { return; }
+            if (!Input.GetMouseButton(0))
+            {
+                _lastHitPoint = null; // debounce for brush interpolation
+                return;
+            }
 
             Vector3 mousePos = Input.mousePosition;
+            
             Ray ray = _deformableMeshDependencies.MainCamera.ScreenPointToRay(mousePos);
 
             if (!Physics.SphereCast(ray, _dataModel.BrushRadius, out RaycastHit hitInfo, Mathf.Infinity, _dataModel.HitLayerMask))
             {
                 return;
             }
+            
+            _cachedInterpolatedPoints = GetInterpolatedPoints(_lastHitPoint, hitInfo.point);
+            _brushVertexSet = new HashSet<int>();
+            foreach (Vector3 point in _cachedInterpolatedPoints)
+            {
+                var brushedVerts = GetVerticesInRadius(point, _dataModel.BrushRadius);
+                foreach (int vert in brushedVerts)
+                {
+                    _brushVertexSet.Add(vert);
+                }
+            }
 
             float deformDelta = _dataModel.DeformSpeed * Time.deltaTime;
-            Vector3 hitPoint = hitInfo.point;
-            _brushedVertices = GetVerticesInRadius(hitPoint, _dataModel.BrushRadius);
-            foreach (int index in _brushedVertices)
+            foreach (int index in _brushVertexSet)
             {
                 _vertices[index] += -Vector3.forward * deformDelta;
             }
 
-            
+            _lastHitPoint = hitInfo.point;
         }
 
         private void InvalidateMesh()
@@ -100,7 +144,6 @@ namespace MeshToy
         private List<int> GetVerticesInRadius(Vector3 hitPoint, float brushRadius)
         {
             List<int> brushedVertices = new();
-
             for (int i = 0; i < _vertices.Count; i++)
             {
                 Vector3 worldVert = transform.TransformPoint(_vertices[i]);
@@ -108,6 +151,20 @@ namespace MeshToy
             }
 
             return brushedVertices;
+        }
+
+        private List<Vector3> GetInterpolatedPoints(Vector3? a, Vector3 b)
+        {
+            if (!a.HasValue) return new List<Vector3> { b };
+            
+            List<Vector3> points = new();
+            for (int i = 0; i < _dataModel.BrushInterpolationSegments; i++)
+            {
+                points.Add(Vector3.Slerp(a.Value, b, (float)i / _dataModel.BrushInterpolationSegments));
+            }
+            points.Add(b); // make sure we have our actual point in the list
+
+            return points;
         }
 
         private void GenerateMesh()
