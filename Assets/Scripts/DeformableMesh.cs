@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Color = UnityEngine.Color;
 
 namespace MeshToy
 {
-    //TODO: potentially cache X prior frames rather than interpolation. then find distance to the spline that those points create
     [RequireComponent(typeof(MeshFilter))]
     [RequireComponent(typeof(MeshCollider))]
     [RequireComponent(typeof(MeshRenderer))]
@@ -147,7 +147,15 @@ namespace MeshToy
             for (int i = 0; i < _vertices.Count; i++)
             {
                 Vector3 worldVert = transform.TransformPoint(_vertices[i]);
-                if (Vector3.Distance(worldVert, hitPoint) <= brushRadius) { brushedVertices.Add(i); }
+                if (!_lastHitPoint.HasValue)
+                {
+                    if (Vector3.Distance(worldVert, hitPoint) <= brushRadius) { brushedVertices.Add(i); }
+                }
+                else
+                {
+                    float distance = DistanceFromPointToLineSegment(worldVert, _lastHitPoint.Value, hitPoint);
+                    if (distance <= brushRadius) { brushedVertices.Add(i); }
+                }
             }
 
             return brushedVertices;
@@ -162,8 +170,8 @@ namespace MeshToy
             {
                 points.Add(Vector3.Slerp(a.Value, b, (float)i / _dataModel.BrushInterpolationSegments));
             }
+            
             points.Add(b); // make sure we have our actual point in the list
-
             return points;
         }
 
@@ -229,6 +237,26 @@ namespace MeshToy
             }
 
             return triangles;
+        }
+        
+        float DistanceFromPointToLineSegment(Vector3 point, Vector3 linePoint1, Vector3 linePoint2)
+        {
+            Vector3 lineVector = linePoint2 - linePoint1;
+            Vector3 pointToLineStart = point - linePoint1;
+    
+            float lineLengthSquared = lineVector.sqrMagnitude; // Avoid unnecessary sqrt
+    
+            if (lineLengthSquared == 0f) return pointToLineStart.magnitude; // The segment is just a point
+
+            // Compute the t parameter of the closest point on the line
+            float t = Vector3.Dot(pointToLineStart, lineVector) / lineLengthSquared;
+            t = Mathf.Clamp(t, 0f, 1f); // Clamp to stay within the segment
+
+            // Compute the closest point on the segment
+            Vector3 closestPoint = linePoint1 + t * lineVector;
+
+            // Return distance from the point to the closest point on the segment
+            return Vector3.Distance(point, closestPoint);
         }
         
         #endregion
