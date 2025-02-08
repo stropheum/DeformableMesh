@@ -1,2 +1,34 @@
 * linguist-vendored
 *.cs linguist-vendored=false
+
+# Unity-specific file types to track with Git LFS
+*.unity filter=lfs diff=lfs merge=lfs
+*.asset filter=lfs diff=lfs merge=lfs
+*.prefab filter=lfs diff=lfs merge=lfs
+*.mat filter=lfs diff=lfs merge=lfs
+*.fbx filter=lfs diff=lfs merge=lfs
+*.png filter=lfs diff=lfs merge=lfs
+*.jpg filter=lfs diff=lfs merge=lfs
+*.jpeg filter=lfs diff=lfs merge=lfs
+*.tga filter=lfs diff=lfs merge=lfs
+*.psd filter=lfs diff=lfs merge=lfs
+*.wav filter=lfs diff=lfs merge=lfs
+*.mp3 filter=lfs diff=lfs merge=lfs
+*.ogg filter=lfs diff=lfs merge=lfs
+*.mp4 filter=lfs diff=lfs merge=lfs
+*.avi filter=lfs diff=lfs merge=lfs
+
+# 3D Model files
+*.obj filter=lfs diff=lfs merge=lfs
+*.stl filter=lfs diff=lfs merge=lfs
+*.dae filter=lfs diff=lfs merge=lfs
+
+# Unity lighting and scene cache files (optional)
+*.exr filter=lfs diff=lfs merge=lfs
+*.hdr filter=lfs diff=lfs merge=lfs
+
+# Ignore large generated cache files (you should exclude these in .gitignore)
+!Temp/*
+!Library/*
+!Logs/*
+!Builds/*
