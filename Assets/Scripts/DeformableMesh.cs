@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -16,7 +15,8 @@ namespace MeshToy
         {
             VertexRange = new Vector2Int(5, 5),
             VertexSpacing = 1.0f,
-            DeformSpeed = 1.0f
+            DeformSpeed = 1.0f,
+            HealingRate = 1.0f
         };
 
         private DeformableMeshDependencies _deformableMeshDependencies;
@@ -86,7 +86,37 @@ namespace MeshToy
 
         private void Update()
         {
+            ApplyHeal();
             HandleMouseInput();
+        }
+
+        private void ApplyHeal()
+        {
+            for (int i = 0; i < _vertices.Count; i++)
+            {
+                if (_brushVertexSet.Contains(i)) { continue; } // Don't heal if we're brushing those verts 
+
+                float height = _vertices[i].z;
+                if (height < 0f)
+                {
+                    height += _dataModel.HealingRate * Time.deltaTime;
+                    if (height >= 0f)
+                    {
+                        height = 0f;
+                    }
+                }
+                else if (height < 0f)
+                {
+                    height -= _dataModel.HealingRate * Time.deltaTime;
+                    if (height <= 0f)
+                    {
+                        height = 0f;
+                    }
+                }
+                _vertices[i] = new Vector3(_vertices[i].x, _vertices[i].y, height);
+            } 
+            _mesh.RecalculateBounds();
+            _mesh.RecalculateNormals();
         }
 
         private void FixedUpdate()
@@ -104,7 +134,6 @@ namespace MeshToy
             _brushVertexSet.Clear();
             if (Input.GetMouseButtonUp(0))
             {
-                Debug.Log("Recalculating normals...");
                 return;
             }
             if (!Input.GetMouseButton(0))
