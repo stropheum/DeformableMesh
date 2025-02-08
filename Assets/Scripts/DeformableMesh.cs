@@ -67,15 +67,12 @@ namespace MeshToy
                 }
             };
             int count = _cachedInterpolatedPoints.Count;
-            string log = "interpolated points:";
             for (int i = 0; i < count; i++)
             {
                 float t = count > 1 ? (float)i / count : 0.0f;
                 Gizmos.color = grad.Evaluate(t);
                 Gizmos.DrawSphere(_cachedInterpolatedPoints[i], 0.01f);
-                log += "\n" + _cachedInterpolatedPoints[i]; 
             }
-            Debug.Log(log);
         }
 
         private void OnGUI()
