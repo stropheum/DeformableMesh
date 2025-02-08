@@ -5,13 +5,14 @@ using UnityEngine;
 [RequireComponent(typeof(MeshRenderer))]
 public class DeformableMesh : MonoBehaviour
 {
-    [SerializeField] private Vector2Int _vertexRange = new Vector2Int(5, 5);
+    [SerializeField] private Vector2Int _vertexRange = new(5, 5);
     [SerializeField] private float _vertexSpacing = 1.0f;
     [SerializeField] private Material _material;
     
     private MeshFilter _meshFilter;
     private MeshRenderer _meshRenderer;
-    
+
+    private Vector3 _origin;
     private List<Vector3> _vertices = new();
 
     private void Awake()
@@ -28,6 +29,7 @@ public class DeformableMesh : MonoBehaviour
 
     private void GenerateMesh()
     {
+        _origin = CalculateMeshOrigin();
         var mesh = new Mesh();
 
         _vertices = ComputeVertices();
@@ -40,6 +42,16 @@ public class DeformableMesh : MonoBehaviour
         _meshRenderer.material = _material;
     }
 
+    private Vector3 CalculateMeshOrigin()
+    {
+        var offset = new Vector3(
+            (_vertexRange.x - 1) * 0.5f,
+            (_vertexRange.y - 1) * 0.5f,
+            0);
+        
+        return transform.InverseTransformPoint(transform.position - offset);
+    }
+
     private List<Vector3> ComputeVertices()
     {
         var result = new List<Vector3>();
@@ -47,7 +59,7 @@ public class DeformableMesh : MonoBehaviour
         {
             for (int j = 0; j < _vertexRange.x; j++)
             {
-                result.Add(new Vector3(j * _vertexSpacing, i * _vertexSpacing, 0));
+                result.Add(_origin + new Vector3(j * _vertexSpacing, i * _vertexSpacing, 0));
             }
         }
 
