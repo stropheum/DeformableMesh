@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -88,12 +89,24 @@ namespace MeshToy
             HandleMouseInput();
         }
 
+        private void FixedUpdate()
+        {
+            if (Input.GetMouseButton(0))
+            {
+                _mesh.RecalculateNormals();
+            }
+        }
+
         #endregion
 
         private void HandleMouseInput()
         {
             _brushVertexSet.Clear();
-            if (Input.GetMouseButtonUp(0)) { return; }
+            if (Input.GetMouseButtonUp(0))
+            {
+                Debug.Log("Recalculating normals...");
+                return;
+            }
             if (!Input.GetMouseButton(0))
             {
                 _lastHitPoint = null; // debounce for brush interpolation
@@ -133,7 +146,8 @@ namespace MeshToy
         {
             _mesh.SetVertices(_vertices);
             _mesh.RecalculateBounds();
-            _mesh.RecalculateNormals();
+            // RecalculateSmoothNormals();
+            // _mesh.RecalculateTangents();
         }
 
         #region Private Methods
@@ -146,7 +160,7 @@ namespace MeshToy
                 Vector3 worldVert = transform.TransformPoint(_vertices[i]);
                 if (!_lastHitPoint.HasValue)
                 {
-                    if (Vector3.Distance(worldVert, hitPoint) <= brushRadius) { brushedVertices.Add(i); }
+                    if (Vector2.Distance(worldVert, hitPoint) <= brushRadius) { brushedVertices.Add(i); }
                 }
                 else
                 {
@@ -184,6 +198,8 @@ namespace MeshToy
             _mesh.SetVertices(_vertices);
             _mesh.triangles = triangles;
             _mesh.RecalculateBounds();
+            _mesh.RecalculateNormals();
+            _mesh.RecalculateTangents();
             _deformableMeshDependencies.MeshFilter.mesh = _mesh;
             _deformableMeshDependencies.MeshCollider.sharedMesh = _mesh;
             _deformableMeshDependencies.MeshRenderer.material = _dataModel.Material;
@@ -225,12 +241,17 @@ namespace MeshToy
                 int topRight = topLeft + 1;
                 int botLeft = topLeft + range.x;
                 int botRight = botLeft + 1;
+                
                 triangles[triangleIndex++] = botLeft;
                 triangles[triangleIndex++] = topLeft;
-                triangles[triangleIndex++] = topRight;
+                triangles[triangleIndex++] = botRight;
+
+                triangles[triangleIndex++] = topLeft;
                 triangles[triangleIndex++] = topRight;
                 triangles[triangleIndex++] = botRight;
-                triangles[triangleIndex++] = botLeft;
+
+
+
             }
 
             return triangles;
@@ -253,9 +274,8 @@ namespace MeshToy
             Vector3 closestPoint = linePoint1 + t * lineVector;
 
             // Return distance from the point to the closest point on the segment
-            return Vector3.Distance(point, closestPoint);
+            return Vector2.Distance(point, closestPoint);
         }
-        
         #endregion
     }
 }
