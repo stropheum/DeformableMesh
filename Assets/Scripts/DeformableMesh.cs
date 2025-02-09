@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Serialization;
 using Color = UnityEngine.Color;
 
 namespace MeshToy
@@ -10,8 +9,9 @@ namespace MeshToy
     [RequireComponent(typeof(MeshRenderer))]
     public class DeformableMesh : MonoBehaviour
     {
-        [FormerlySerializedAs("_controlArgs")] [SerializeField]
-        private DeformableMeshDataModel _dataModel = new()
+        private static readonly int Property = Shader.PropertyToID("_MaxDepth");
+
+        [SerializeField] private DeformableMeshDataModel _dataModel = new()
         {
             VertexRange = new Vector2Int(5, 5),
             VertexSpacing = 1.0f,
@@ -27,7 +27,7 @@ namespace MeshToy
         private Mesh _mesh;
         private Vector3? _lastHitPoint;
         private IReadOnlyList<Vector3> _cachedInterpolatedPoints;
-        private bool _mouseButtonDown = false;
+        private bool _mouseButtonDown;
 
         #region Unity Methods
 
@@ -42,20 +42,19 @@ namespace MeshToy
 
         private void Start()
         {
+            _dataModel.Material.SetFloat(Property, _dataModel.MaxDepth); // Bind max depth to shader
             GenerateMesh();
         }
 
         private void OnDrawGizmos()
         {
             if (!_dataModel.DrawGizmos) { return; }
+
             Gizmos.color = Color.cyan;
-            foreach (Vector3 vert in _vertices)
-            {
-                Gizmos.DrawSphere(vert, 0.01f);
-            }
+            foreach (Vector3 vert in _vertices) Gizmos.DrawSphere(vert, 0.01f);
 
             if (_brushVertexSet is not { Count: > 0 }) { return; }
-            
+
             var grad = new Gradient
             {
                 colorKeys = new GradientColorKey[]
@@ -77,57 +76,28 @@ namespace MeshToy
                 Gizmos.DrawSphere(_cachedInterpolatedPoints[i], 0.01f);
             }
         }
+        
+        private void OnValidate()
+        {
+            _dataModel.Material?.SetFloat(Property, _dataModel.MaxDepth);
+        }
 
         private void OnGUI()
         {
-            if (_brushVertexSet.Count > 0 || !_lastHitPoint.HasValue)
-            {
-                InvalidateMesh();
-            }
+            if (_brushVertexSet.Count > 0 || !_lastHitPoint.HasValue) { InvalidateMesh(); }
         }
 
         private void Update()
         {
-            if (Input.GetMouseButtonUp(0))
-            {
-                _mouseButtonDown = false;
-            }
+            if (Input.GetMouseButtonUp(0)) { _mouseButtonDown = false; }
             else if (Input.GetMouseButtonDown(0))
             {
                 _mouseButtonDown = true;
                 _lastHitPoint = null;
             }
+
             ApplyHeal();
             HandleMouseInput();
-        }
-
-        private void ApplyHeal()
-        {
-            for (int i = 0; i < _vertices.Count; i++)
-            {
-                if (_brushVertexSet.Contains(i)) { continue; } // Don't heal if we're brushing those verts 
-
-                float height = _vertices[i].z;
-                if (height < 0f)
-                {
-                    height += _dataModel.HealingRate * Time.deltaTime;
-                    if (height >= 0f)
-                    {
-                        height = 0f;
-                    }
-                }
-                else if (height < 0f)
-                {
-                    height -= _dataModel.HealingRate * Time.deltaTime;
-                    if (height <= 0f)
-                    {
-                        height = 0f;
-                    }
-                }
-                _vertices[i] = new Vector3(_vertices[i].x, _vertices[i].y, height);
-            } 
-            _mesh.SetVertices(_vertices);
-            _mesh.RecalculateBounds();
         }
 
         private void FixedUpdate()
@@ -140,33 +110,25 @@ namespace MeshToy
         private void HandleMouseInput()
         {
             _brushVertexSet.Clear();
-            if (Input.GetMouseButtonUp(0))
-            {
-                return;
-            }
-            if (!_mouseButtonDown)
-            {
-                return;
-            }
+            if (Input.GetMouseButtonUp(0)) { return; }
+
+            if (!_mouseButtonDown) { return; }
 
             Vector3 mousePos = Input.mousePosition;
-            
+
             Ray ray = _deformableMeshDependencies.MainCamera.ScreenPointToRay(mousePos);
 
             if (!Physics.SphereCast(ray, _dataModel.BrushRadius, out RaycastHit hitInfo, Mathf.Infinity, _dataModel.HitLayerMask))
             {
                 return;
             }
-            
+
             _cachedInterpolatedPoints = GetInterpolatedPoints(_lastHitPoint, hitInfo.point);
             _brushVertexSet = new HashSet<int>();
             foreach (Vector3 point in _cachedInterpolatedPoints)
             {
                 var brushedVerts = GetVerticesInRadius(point, _dataModel.BrushRadius);
-                foreach (int vert in brushedVerts)
-                {
-                    _brushVertexSet.Add(vert);
-                }
+                foreach (int vert in brushedVerts) _brushVertexSet.Add(vert);
             }
 
             float deformDelta = _dataModel.DeformSpeed * Time.deltaTime;
@@ -174,7 +136,7 @@ namespace MeshToy
             foreach (int index in _brushVertexSet)
             {
                 _vertices[index] += -Vector3.forward * deformDelta;
-                float clampedHeight = Mathf.Clamp(value: _vertices[index].z, min: -max, max: max);
+                float clampedHeight = Mathf.Clamp(_vertices[index].z, -max, max);
                 _vertices[index] = new Vector3(_vertices[index].x, _vertices[index].y, clampedHeight);
             }
 
@@ -185,12 +147,35 @@ namespace MeshToy
         {
             _mesh.SetVertices(_vertices);
             _mesh.RecalculateBounds();
-            // RecalculateSmoothNormals();
-            // _mesh.RecalculateTangents();
         }
 
         #region Private Methods
-        
+
+        private void ApplyHeal()
+        {
+            for (int i = 0; i < _vertices.Count; i++)
+            {
+                if (_brushVertexSet.Contains(i)) { continue; } // Don't heal if we're brushing those verts 
+
+                float height = _vertices[i].z;
+                if (height < 0f)
+                {
+                    height += _dataModel.HealingRate * Time.deltaTime;
+                    if (height >= 0f) { height = 0f; }
+                }
+                else if (height < 0f)
+                {
+                    height -= _dataModel.HealingRate * Time.deltaTime;
+                    if (height <= 0f) { height = 0f; }
+                }
+
+                _vertices[i] = new Vector3(_vertices[i].x, _vertices[i].y, height);
+            }
+
+            _mesh.SetVertices(_vertices);
+            _mesh.RecalculateBounds();
+        }
+
         private List<int> GetVerticesInRadius(Vector3 hitPoint, float brushRadius)
         {
             List<int> brushedVertices = new();
@@ -213,14 +198,12 @@ namespace MeshToy
 
         private List<Vector3> GetInterpolatedPoints(Vector3? a, Vector3 b)
         {
-            if (!a.HasValue) return new List<Vector3> { b };
-            
+            if (!a.HasValue) { return new List<Vector3> { b }; }
+
             List<Vector3> points = new();
             for (int i = 0; i < _dataModel.BrushInterpolationSegments; i++)
-            {
                 points.Add(Vector3.Slerp(a.Value, b, (float)i / _dataModel.BrushInterpolationSegments));
-            }
-            
+
             points.Add(b); // make sure we have our actual point in the list
             return points;
         }
@@ -280,7 +263,7 @@ namespace MeshToy
                 int topRight = topLeft + 1;
                 int botLeft = topLeft + range.x;
                 int botRight = botLeft + 1;
-                
+
                 triangles[triangleIndex++] = botLeft;
                 triangles[triangleIndex++] = topLeft;
                 triangles[triangleIndex++] = botRight;
@@ -288,22 +271,22 @@ namespace MeshToy
                 triangles[triangleIndex++] = topLeft;
                 triangles[triangleIndex++] = topRight;
                 triangles[triangleIndex++] = botRight;
-
-
-
             }
 
             return triangles;
         }
-        
-        float DistanceFromPointToLineSegment(Vector2 point, Vector2 linePoint1, Vector2 linePoint2)
+
+        private float DistanceFromPointToLineSegment(Vector2 point, Vector2 linePoint1, Vector2 linePoint2)
         {
             Vector2 lineVector = linePoint2 - linePoint1;
             Vector2 pointToLineStart = point - linePoint1;
-    
+
             float lineLengthSquared = lineVector.sqrMagnitude; // Avoid unnecessary sqrt
-    
-            if (lineLengthSquared == 0f) return pointToLineStart.magnitude; // The segment is just a point
+
+            if (lineLengthSquared == 0f)
+            {
+                return pointToLineStart.magnitude; // The segment is just a point
+            }
 
             // Compute the t parameter of the closest point on the line
             float t = Vector2.Dot(pointToLineStart, lineVector) / lineLengthSquared;
@@ -315,6 +298,7 @@ namespace MeshToy
             // Return distance from the point to the closest point on the segment
             return Vector2.Distance(point, closestPoint);
         }
+
         #endregion
     }
 }
