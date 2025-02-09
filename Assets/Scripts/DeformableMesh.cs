@@ -20,6 +20,9 @@ namespace MeshToy
             MaxDepth = 1.0f
         };
 
+        private bool LeftMouseDownExclusive => _leftMouseButtonDown && !_rightMouseButtonDown;
+        private bool RightMouseDownExclusive => _rightMouseButtonDown && !_leftMouseButtonDown;
+
         private DeformableMeshDependencies _deformableMeshDependencies;
         private Vector3 _origin;
         private List<Vector3> _vertices = new();
@@ -27,7 +30,8 @@ namespace MeshToy
         private Mesh _mesh;
         private Vector3? _lastHitPoint;
         private IReadOnlyList<Vector3> _cachedInterpolatedPoints;
-        private bool _mouseButtonDown;
+        private bool _leftMouseButtonDown;
+        private bool _rightMouseButtonDown;
 
         #region Unity Methods
 
@@ -89,10 +93,17 @@ namespace MeshToy
 
         private void Update()
         {
-            if (Input.GetMouseButtonUp(0)) { _mouseButtonDown = false; }
+            if (Input.GetMouseButtonUp(0)) { _leftMouseButtonDown = false; }
             else if (Input.GetMouseButtonDown(0))
             {
-                _mouseButtonDown = true;
+                _leftMouseButtonDown = true;
+                _lastHitPoint = null;
+            }
+            
+            if (Input.GetMouseButtonUp(1)) { _rightMouseButtonDown = false; }
+            else if (Input.GetMouseButtonDown(1))
+            {
+                _rightMouseButtonDown = true;
                 _lastHitPoint = null;
             }
 
@@ -110,9 +121,9 @@ namespace MeshToy
         private void HandleMouseInput()
         {
             _brushVertexSet.Clear();
-            if (Input.GetMouseButtonUp(0)) { return; }
+            if (Input.GetMouseButtonUp(0) || Input.GetMouseButtonUp(1)) { return; }
 
-            if (!_mouseButtonDown) { return; }
+            if (!_leftMouseButtonDown && !_rightMouseButtonDown) { return; }
 
             Vector3 mousePos = Input.mousePosition;
 
@@ -133,9 +144,13 @@ namespace MeshToy
 
             float deformDelta = _dataModel.DeformSpeed * Time.deltaTime;
             float max = _dataModel.MaxDepth;
+            
+            float direction = 0;
+            if (LeftMouseDownExclusive) { direction = -1; }
+            else if (RightMouseDownExclusive) { direction = 1;}
             foreach (int index in _brushVertexSet)
             {
-                _vertices[index] += -Vector3.forward * deformDelta;
+                _vertices[index] += Vector3.forward * (direction * deformDelta);
                 float clampedHeight = Mathf.Clamp(_vertices[index].z, -max, max);
                 _vertices[index] = new Vector3(_vertices[index].x, _vertices[index].y, clampedHeight);
             }
@@ -158,15 +173,22 @@ namespace MeshToy
                 if (_brushVertexSet.Contains(i)) { continue; } // Don't heal if we're brushing those verts 
 
                 float height = _vertices[i].z;
-                if (height < 0f)
+                switch (height)
                 {
-                    height += _dataModel.HealingRate * Time.deltaTime;
-                    if (height >= 0f) { height = 0f; }
-                }
-                else if (height < 0f)
-                {
-                    height -= _dataModel.HealingRate * Time.deltaTime;
-                    if (height <= 0f) { height = 0f; }
+                    case < 0f:
+                    {
+                        height += _dataModel.HealingRate * Time.deltaTime;
+                        if (height >= 0f) { height = 0f; }
+                        break;
+                    }
+                    case > 0f:
+                    {
+                        height -= _dataModel.HealingRate * Time.deltaTime;
+                        if (height <= 0f) { height = 0f; }
+                        break;
+                    }
+                    default:
+                        continue;
                 }
 
                 _vertices[i] = new Vector3(_vertices[i].x, _vertices[i].y, height);
