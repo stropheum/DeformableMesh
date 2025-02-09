@@ -16,7 +16,8 @@ namespace MeshToy
             VertexRange = new Vector2Int(5, 5),
             VertexSpacing = 1.0f,
             DeformSpeed = 1.0f,
-            HealingRate = 1.0f
+            HealingRate = 1.0f,
+            MaxDepth = 1.0f
         };
 
         private DeformableMeshDependencies _deformableMeshDependencies;
@@ -26,6 +27,7 @@ namespace MeshToy
         private Mesh _mesh;
         private Vector3? _lastHitPoint;
         private IReadOnlyList<Vector3> _cachedInterpolatedPoints;
+        private bool _mouseButtonDown = false;
 
         #region Unity Methods
 
@@ -86,6 +88,15 @@ namespace MeshToy
 
         private void Update()
         {
+            if (Input.GetMouseButtonUp(0))
+            {
+                _mouseButtonDown = false;
+            }
+            else if (Input.GetMouseButtonDown(0))
+            {
+                _mouseButtonDown = true;
+                _lastHitPoint = null;
+            }
             ApplyHeal();
             HandleMouseInput();
         }
@@ -115,16 +126,13 @@ namespace MeshToy
                 }
                 _vertices[i] = new Vector3(_vertices[i].x, _vertices[i].y, height);
             } 
+            _mesh.SetVertices(_vertices);
             _mesh.RecalculateBounds();
-            _mesh.RecalculateNormals();
         }
 
         private void FixedUpdate()
         {
-            if (Input.GetMouseButton(0))
-            {
-                _mesh.RecalculateNormals();
-            }
+            _mesh.RecalculateNormals();
         }
 
         #endregion
@@ -136,9 +144,8 @@ namespace MeshToy
             {
                 return;
             }
-            if (!Input.GetMouseButton(0))
+            if (!_mouseButtonDown)
             {
-                _lastHitPoint = null; // debounce for brush interpolation
                 return;
             }
 
@@ -163,9 +170,12 @@ namespace MeshToy
             }
 
             float deformDelta = _dataModel.DeformSpeed * Time.deltaTime;
+            float max = _dataModel.MaxDepth;
             foreach (int index in _brushVertexSet)
             {
                 _vertices[index] += -Vector3.forward * deformDelta;
+                float clampedHeight = Mathf.Clamp(value: _vertices[index].z, min: -max, max: max);
+                _vertices[index] = new Vector3(_vertices[index].x, _vertices[index].y, clampedHeight);
             }
 
             _lastHitPoint = hitInfo.point;
@@ -286,21 +296,21 @@ namespace MeshToy
             return triangles;
         }
         
-        float DistanceFromPointToLineSegment(Vector3 point, Vector3 linePoint1, Vector3 linePoint2)
+        float DistanceFromPointToLineSegment(Vector2 point, Vector2 linePoint1, Vector2 linePoint2)
         {
-            Vector3 lineVector = linePoint2 - linePoint1;
-            Vector3 pointToLineStart = point - linePoint1;
+            Vector2 lineVector = linePoint2 - linePoint1;
+            Vector2 pointToLineStart = point - linePoint1;
     
             float lineLengthSquared = lineVector.sqrMagnitude; // Avoid unnecessary sqrt
     
             if (lineLengthSquared == 0f) return pointToLineStart.magnitude; // The segment is just a point
 
             // Compute the t parameter of the closest point on the line
-            float t = Vector3.Dot(pointToLineStart, lineVector) / lineLengthSquared;
+            float t = Vector2.Dot(pointToLineStart, lineVector) / lineLengthSquared;
             t = Mathf.Clamp(t, 0f, 1f); // Clamp to stay within the segment
 
             // Compute the closest point on the segment
-            Vector3 closestPoint = linePoint1 + t * lineVector;
+            Vector2 closestPoint = linePoint1 + t * lineVector;
 
             // Return distance from the point to the closest point on the segment
             return Vector2.Distance(point, closestPoint);

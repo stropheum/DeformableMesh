@@ -15,6 +15,7 @@ namespace MeshToy
         [SerializeField] public int BrushInterpolationSegments;
         [SerializeField] public bool DrawGizmos;
         [SerializeField] public float HealingRate;
+        [SerializeField] public float MaxDepth;
     }
 
     [Serializable]
