@@ -80,7 +80,7 @@ namespace MeshToy
                 Gizmos.DrawSphere(_cachedInterpolatedPoints[i], 0.01f);
             }
         }
-        
+
         private void OnValidate()
         {
             _dataModel.Material?.SetFloat(Property, _dataModel.MaxDepth);
@@ -99,7 +99,7 @@ namespace MeshToy
                 _leftMouseButtonDown = true;
                 _lastHitPoint = null;
             }
-            
+
             if (Input.GetMouseButtonUp(1)) { _rightMouseButtonDown = false; }
             else if (Input.GetMouseButtonDown(1))
             {
@@ -144,10 +144,11 @@ namespace MeshToy
 
             float deformDelta = _dataModel.DeformSpeed * Time.deltaTime;
             float max = _dataModel.MaxDepth;
-            
+
             float direction = 0;
             if (LeftMouseDownExclusive) { direction = -1; }
-            else if (RightMouseDownExclusive) { direction = 1;}
+            else if (RightMouseDownExclusive) { direction = 1; }
+
             foreach (int index in _brushVertexSet)
             {
                 _vertices[index] += Vector3.forward * (direction * deformDelta);
@@ -179,12 +180,14 @@ namespace MeshToy
                     {
                         height += _dataModel.HealingRate * Time.deltaTime;
                         if (height >= 0f) { height = 0f; }
+
                         break;
                     }
                     case > 0f:
                     {
                         height -= _dataModel.HealingRate * Time.deltaTime;
                         if (height <= 0f) { height = 0f; }
+
                         break;
                     }
                     default:
